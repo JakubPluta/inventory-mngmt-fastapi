@@ -4,6 +4,8 @@ from app import models
 from app.models import SupplierPydantic, SupplierPydanticIn, ProductPydanticIn, ProductPydantic, Supplier, Product
 from fastapi import status, HTTPException
 from tortoise.exceptions import DoesNotExist
+from typing import List, Optional
+
 
 app = FastAPI()
 
@@ -23,12 +25,12 @@ async def add_supplier(supplier_info: SupplierPydanticIn) -> SupplierPydantic:
 
 
 @app.get('/supplier')
-async def get_all_suppliers():
+async def get_all_suppliers() -> List[SupplierPydantic]:
     return await SupplierPydantic.from_queryset(Supplier.all())
 
 
 @app.get('/supplier/{supplier_id}', response_model=SupplierPydantic, status_code=status.HTTP_200_OK)
-async def get_supplier_by_id(supplier_id: int):
+async def get_supplier_by_id(supplier_id: int) -> SupplierPydantic:
     try:
         supplier = await SupplierPydantic.from_queryset_single(Supplier.get(id=supplier_id))
     except Exception:
@@ -37,13 +39,37 @@ async def get_supplier_by_id(supplier_id: int):
 
 
 @app.get('/supplier/{supplier_name}/name', response_model=SupplierPydantic, status_code=status.HTTP_200_OK)
-async def get_supplier_by_name(supplier_name: str):
+async def get_supplier_by_name(supplier_name: str) -> SupplierPydantic:
     try:
         supplier = await SupplierPydantic.from_queryset_single(Supplier.get(name=supplier_name))
     except Exception:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Supplier with name {supplier_name} was not found.")
     return supplier
 
+
+@app.put('/supplier/{supplier_id}')
+async def update_supplier(supplier_id: int, supplier_update: SupplierPydanticIn) -> SupplierPydantic:
+    try:
+        supplier = await Supplier.get(id=supplier_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Supplier with id {supplier_id} was not found.")
+
+    update_info = supplier_update.dict(exclude_unset=True)
+    for k, v in update_info.items():
+        setattr(supplier, k, v)
+    await supplier.save()
+    return await SupplierPydantic.from_tortoise_orm(supplier)
+
+
+@app.delete('/supplier/{supplier_id}',status_code=status.HTTP_200_OK)
+async def delete_supplier(supplier_id: int) -> dict:
+    try:
+        supplier = await Supplier.get(id=supplier_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Supplier with id {supplier_id} was not found.")
+    await supplier.delete()
+    return {'message' : f'Supplier with id {supplier_id} was successfully deleted'}
 
 
 DB_URI = 'sqlite://db.sqlite3'
