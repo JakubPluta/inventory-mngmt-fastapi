@@ -13,7 +13,7 @@ class Supplier(Model):
     email = fields.CharField(max_length=100)
     phone = fields.CharField(max_length=15)
 
-    product: fields.ReverseRelation["Product"]
+    products: fields.ReverseRelation["Product"]
 
 
 SupplierPydantic = pydantic_model_creator(Supplier, name="Supplier")

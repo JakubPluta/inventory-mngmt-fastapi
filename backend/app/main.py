@@ -26,7 +26,7 @@ def index():
 
 
 @app.post("/supplier", status_code=status.HTTP_200_OK, response_model=SupplierPydantic)
-async def add_supplier(supplier_info: SupplierPydanticIn) -> SupplierPydantic:
+async def create_supplier(supplier_info: SupplierPydanticIn) -> SupplierPydantic:
     supplier = await Supplier.create(
         **supplier_info.dict(exclude_unset=True),
     )
@@ -125,6 +125,19 @@ async def get_product(product_id: int):
     return await ProductPydantic.from_queryset_single(product)
 
 
+@app.get("/supplier/{supplier_id}/products")
+async def get_all_supplier_products(supplier_id: int):
+    try:
+        supplier = await Supplier.get(id=supplier_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Supplier with id {supplier_id} was not found.",
+        )
+
+    return await supplier.products
+
+
 @app.post("/products", status_code=status.HTTP_200_OK, response_model=ProductPydantic)
 async def create_product(supplier_id: int, product_in: ProductPydanticIn):
     try:
@@ -136,8 +149,49 @@ async def create_product(supplier_id: int, product_in: ProductPydanticIn):
         )
 
     product_info = product_in.dict(exclude_unset=True)
+    product_info["revenue"] += (
+        product_info["quantity_sold"] * product_info["unit_price"]
+    )
     product = Product.create(**product_info, supplied_by=supplier)
     return await ProductPydantic.from_queryset(product)
+
+
+@app.put(
+    "/products/{product_id}",
+    response_model=ProductPydantic,
+    status_code=status.HTTP_200_OK,
+)
+async def update_product(product_id: int, update_info: ProductPydanticIn):
+    try:
+        product = await Product.get(id=product_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product with id {product_id} was not found.",
+        )
+
+    update_dict = update_info.dict(exclude_unset=True)
+    product.name = update_dict["name"]
+    product.quantity_in_stock = update_dict["quantity_in_stock"]
+    product.revenue += update_dict["quantity_sold"] * update_dict["unit_price"]
+    product.quantity_sold += update_dict["quantity_sold"]
+    product.unit_price = update_dict["unit_price"]
+    await product.save()
+    return await ProductPydantic.from_queryset(product)
+
+
+@app.delete("/products/{product_id}")
+async def delete_product(product_id: int):
+    try:
+        product = await Product.get(id=product_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product with id {product_id} was not found",
+        )
+
+    await product.delete()
+    return {"message": f"Product with id {product_id} was successfully deleted"}
 
 
 DB_URI = "sqlite://db.sqlite3"

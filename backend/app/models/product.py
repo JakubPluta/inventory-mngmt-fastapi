@@ -3,7 +3,6 @@ from __future__ import annotations
 from tortoise import fields
 from tortoise.contrib.pydantic import pydantic_model_creator
 from tortoise.models import Model
-from supplier import Supplier
 
 
 class Product(Model):
@@ -22,7 +21,7 @@ class Product(Model):
         default=0.00,
     )
 
-    supplied_by: fields.ForeignKeyRelation["Supplier"] = fields.ForeignKeyField(
+    supplied_by = fields.ForeignKeyField(
         "models.Supplier",
         related_name="products",
     )
