@@ -1,197 +1,35 @@
 from __future__ import annotations
 
-from typing import List
-from typing import Optional
-
 from app import models
-from app.models import Product
-from app.models import ProductPydantic
-from app.models import ProductPydanticIn
-from app.models import Supplier
-from app.models import SupplierPydantic
-from app.models import SupplierPydanticIn
+from app.routes.supplier import router as supplier_router
+from app.routes.product import router as product_router
+from app.routes.mail import router as mail_router
 from fastapi import FastAPI
-from fastapi import HTTPException
-from fastapi import status
 from tortoise.contrib.fastapi import register_tortoise
-from tortoise.exceptions import DoesNotExist
+from fastapi.middleware.cors import CORSMiddleware
 
+
+origins = ["http://localhost:3000"]
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+app.include_router(router=supplier_router, prefix="/suppliers", tags=["supplier"])
+app.include_router(router=product_router, prefix="/products", tags=["products"])
+app.include_router(router=mail_router, prefix="/email", tags=["email"])
 
 
 @app.get("/")
 def index():
     return {"msg": "hello world"}
-
-
-@app.post("/supplier", status_code=status.HTTP_200_OK, response_model=SupplierPydantic)
-async def create_supplier(supplier_info: SupplierPydanticIn) -> SupplierPydantic:
-    supplier = await Supplier.create(
-        **supplier_info.dict(exclude_unset=True),
-    )
-    resp = await SupplierPydantic.from_tortoise_orm(supplier)
-    return resp
-
-
-@app.get("/supplier")
-async def get_all_suppliers() -> List[SupplierPydantic]:
-    return await SupplierPydantic.from_queryset(Supplier.all())
-
-
-@app.get(
-    "/supplier/{supplier_id}",
-    response_model=SupplierPydantic,
-    status_code=status.HTTP_200_OK,
-)
-async def get_supplier_by_id(supplier_id: int) -> SupplierPydantic:
-    try:
-        supplier = await SupplierPydantic.from_queryset_single(
-            Supplier.get(id=supplier_id),
-        )
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Supplier with id {supplier_id} was not found.",
-        )
-    return supplier
-
-
-@app.get(
-    "/supplier/{supplier_name}/name",
-    response_model=SupplierPydantic,
-    status_code=status.HTTP_200_OK,
-)
-async def get_supplier_by_name(supplier_name: str) -> SupplierPydantic:
-    try:
-        supplier = await SupplierPydantic.from_queryset_single(
-            Supplier.get(name=supplier_name),
-        )
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Supplier with name {supplier_name} was not found.",
-        )
-    return supplier
-
-
-@app.put("/supplier/{supplier_id}")
-async def update_supplier(
-    supplier_id: int,
-    supplier_update: SupplierPydanticIn,
-) -> SupplierPydantic:
-    try:
-        supplier = await Supplier.get(id=supplier_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Supplier with id {supplier_id} was not found.",
-        )
-
-    update_info = supplier_update.dict(exclude_unset=True)
-    for k, v in update_info.items():
-        setattr(supplier, k, v)
-    await supplier.save()
-    return await SupplierPydantic.from_tortoise_orm(supplier)
-
-
-@app.delete("/supplier/{supplier_id}", status_code=status.HTTP_200_OK)
-async def delete_supplier(supplier_id: int) -> dict:
-    try:
-        supplier = await Supplier.get(id=supplier_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Supplier with id {supplier_id} was not found.",
-        )
-    await supplier.delete()
-    return {"message": f"Supplier with id {supplier_id} was successfully deleted"}
-
-
-@app.get("/products")
-async def get_all_products():
-    return await ProductPydantic.from_queryset(Product.all())
-
-
-@app.get("/products/{product_id}")
-async def get_product(product_id: int):
-    try:
-        product = await Product.get(id=product_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Product with id {product_id} was not found.",
-        )
-    return await ProductPydantic.from_queryset_single(product)
-
-
-@app.get("/supplier/{supplier_id}/products")
-async def get_all_supplier_products(supplier_id: int):
-    try:
-        supplier = await Supplier.get(id=supplier_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Supplier with id {supplier_id} was not found.",
-        )
-
-    return await supplier.products
-
-
-@app.post("/products", status_code=status.HTTP_200_OK, response_model=ProductPydantic)
-async def create_product(supplier_id: int, product_in: ProductPydanticIn):
-    try:
-        supplier = await Supplier.get(id=supplier_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Supplier with id {supplier_id} was not found.",
-        )
-
-    product_info = product_in.dict(exclude_unset=True)
-    product_info["revenue"] += (
-        product_info["quantity_sold"] * product_info["unit_price"]
-    )
-    product = Product.create(**product_info, supplied_by=supplier)
-    return await ProductPydantic.from_queryset(product)
-
-
-@app.put(
-    "/products/{product_id}",
-    response_model=ProductPydantic,
-    status_code=status.HTTP_200_OK,
-)
-async def update_product(product_id: int, update_info: ProductPydanticIn):
-    try:
-        product = await Product.get(id=product_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Product with id {product_id} was not found.",
-        )
-
-    update_dict = update_info.dict(exclude_unset=True)
-    product.name = update_dict["name"]
-    product.quantity_in_stock = update_dict["quantity_in_stock"]
-    product.revenue += update_dict["quantity_sold"] * update_dict["unit_price"]
-    product.quantity_sold += update_dict["quantity_sold"]
-    product.unit_price = update_dict["unit_price"]
-    await product.save()
-    return await ProductPydantic.from_queryset(product)
-
-
-@app.delete("/products/{product_id}")
-async def delete_product(product_id: int):
-    try:
-        product = await Product.get(id=product_id)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Product with id {product_id} was not found",
-        )
-
-    await product.delete()
-    return {"message": f"Product with id {product_id} was successfully deleted"}
 
 
 DB_URI = "sqlite://db.sqlite3"
