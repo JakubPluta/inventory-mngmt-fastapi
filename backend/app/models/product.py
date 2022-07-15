@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from tortoise import fields
-from tortoise.contrib.pydantic import pydantic_model_creator
 from tortoise.models import Model
 
 
@@ -25,11 +24,3 @@ class Product(Model):
         "models.Supplier",
         related_name="products",
     )
-
-
-ProductPydantic = pydantic_model_creator(Product, name="Product")
-ProductPydanticIn = pydantic_model_creator(
-    Product,
-    name="ProductIn",
-    exclude_readonly=True,
-)

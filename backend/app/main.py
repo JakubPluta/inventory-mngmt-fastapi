@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app import models
+from app import schemas
 from app.routes.supplier import router as supplier_router
 from app.routes.product import router as product_router
 from app.routes.mail import router as mail_router

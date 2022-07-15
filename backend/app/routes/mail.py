@@ -1,41 +1,23 @@
 from starlette.responses import JSONResponse
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
-from pydantic import BaseModel, EmailStr
-from typing import List
+from app.schemas import EmailContent, EmailSchema
 from fastapi import APIRouter
-from dotenv import dotenv_values
 from app.models import Product
 from fastapi import status
-from pathlib import Path
-import os
-
-root_dir = Path(__file__).resolve().parent.parent.parent
-env_file = os.path.join(root_dir, ".env")
-credentials = dotenv_values(env_file)
-
+from app.core.config import settings
 
 router = APIRouter()
 
-
 conf = ConnectionConfig(
-    MAIL_USERNAME=credentials.get("EMAIL", "REPLACE_ME"),
-    MAIL_PASSWORD=credentials.get("PASSWORD", "REPLACE_ME"),
-    MAIL_FROM=credentials.get("EMAIL", "REPLACE_ME"),
-    MAIL_PORT=587,
-    MAIL_SERVER="smtp-relay.sendinblue.com",
+    MAIL_USERNAME=settings.MAIL_ADDRESS,
+    MAIL_PASSWORD=settings.MAIL_PASSWORD,
+    MAIL_FROM=settings.MAIL_ADDRESS,
+    MAIL_PORT=settings.MAIL_PORT,
+    MAIL_SERVER=settings.MAIL_SERVER,
     MAIL_TLS=True,
     MAIL_SSL=False,
     USE_CREDENTIALS=True,
 )
-
-
-class EmailSchema(BaseModel):
-    email: List[EmailStr]
-
-
-class EmailContent(BaseModel):
-    message: str
-    subject: str
 
 
 @router.post("/{product_id}")
